@@ -1,1 +1,1 @@
-module.exports = require('./lib/cassandra.js');
+module.exports = require('./src/cassandra.js');
