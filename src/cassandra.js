@@ -166,8 +166,8 @@ Cassandra.prototype.findOne = function (model, keyValues, columns, callback) {
     }
 
     var modelDefine = this.getModelDefinition(model);
-    var partitionKeys = modelDefine.model.definition.settings.partitionKeys;
-    var clustering = modelDefine.model.definition.settings.clustering;
+    var partitionKeys = modelDefine.model.definition.settings.partitionKeys || [];
+    var clustering = modelDefine.model.definition.settings.clustering || [];
 
     var keys = partitionKeys.concat(clustering);
 
@@ -237,8 +237,8 @@ Cassandra.prototype.find = function (model, keyValues, columns, orderBy, limit, 
  */
 Cassandra.prototype.update = function (model, data, checkExists, callback) {
     var modelDefine = this.getModelDefinition(model);
-    var partitionKeys = modelDefine.model.definition.settings.partitionKeys;
-    var clustering = modelDefine.model.definition.settings.clustering;
+    var partitionKeys = modelDefine.model.definition.settings.partitionKeys || [];
+    var clustering = modelDefine.model.definition.settings.clustering || [];
     var props = modelDefine.model.definition.rawProperties;
 
     var keys = partitionKeys.concat(clustering);
