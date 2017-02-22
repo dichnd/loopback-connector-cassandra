@@ -1,8 +1,10 @@
 ## loopback-connector-cassandra
 
-The Cassandra Connector module for for [loopback-datasource-juggler](http://docs.strongloop.com/loopback-datasource-juggler/).
-
-Please see the [official documentation](http://docs.strongloop.com/display/LB/Cassandra+connector).
+- loopback connector for cassandra database
+- build method create, findOne, find, patch, update, delete
+- To export Rest API from model
+    + insert "loopback-connector-cassandra/models" to model-config.json to load BaseCassandraModel
+    + extend BaseCassandraModel when create your custom model
 
 
 ## Connector settings

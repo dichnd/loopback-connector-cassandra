@@ -1,25 +1,77 @@
 {
-  "name": "loopback-connector-cassandra",
-  "version": "1.0.0",
-  "description": "Loopback Cassandra Connector",
-  "keywords": [
-    "StrongLoop",
-    "LoopBack",
-    "Cassandra",
-    "DataSource",
-    "Connector"
+  "_args": [
+    [
+      {
+        "raw": "loopback-connector-cassandra@git+https://github.com/dichnd/loopback-connector-cassandra.git",
+        "scope": null,
+        "escapedName": "loopback-connector-cassandra",
+        "name": "loopback-connector-cassandra",
+        "rawSpec": "git+https://github.com/dichnd/loopback-connector-cassandra.git",
+        "spec": "git+https://github.com/dichnd/loopback-connector-cassandra.git",
+        "type": "hosted",
+        "hosted": {
+          "type": "github",
+          "ssh": "git@github.com:dichnd/loopback-connector-cassandra.git",
+          "sshUrl": "git+ssh://git@github.com/dichnd/loopback-connector-cassandra.git",
+          "httpsUrl": "git+https://github.com/dichnd/loopback-connector-cassandra.git",
+          "gitUrl": "git://github.com/dichnd/loopback-connector-cassandra.git",
+          "shortcut": "github:dichnd/loopback-connector-cassandra",
+          "directUrl": "https://raw.githubusercontent.com/dichnd/loopback-connector-cassandra/master/package.json"
+        }
+      },
+      "E:\\codes\\test-cassandra-connector"
+    ]
   ],
-  "main": "index.js",
-  "scripts": {
-    "test": "mocha -R spec --timeout 10000 --require test/init.js test/*.test.js"
+  "_from": "git+https://github.com/dichnd/loopback-connector-cassandra.git",
+  "_id": "loopback-connector-cassandra@1.0.0",
+  "_inCache": true,
+  "_location": "/loopback-connector-cassandra",
+  "_phantomChildren": {
+    "bluebird": "3.4.7",
+    "debug": "2.2.0",
+    "long": "2.4.0",
+    "msgpack5": "3.4.1",
+    "strong-globalize": "2.8.2"
+  },
+  "_requested": {
+    "raw": "loopback-connector-cassandra@git+https://github.com/dichnd/loopback-connector-cassandra.git",
+    "scope": null,
+    "escapedName": "loopback-connector-cassandra",
+    "name": "loopback-connector-cassandra",
+    "rawSpec": "git+https://github.com/dichnd/loopback-connector-cassandra.git",
+    "spec": "git+https://github.com/dichnd/loopback-connector-cassandra.git",
+    "type": "hosted",
+    "hosted": {
+      "type": "github",
+      "ssh": "git@github.com:dichnd/loopback-connector-cassandra.git",
+      "sshUrl": "git+ssh://git@github.com/dichnd/loopback-connector-cassandra.git",
+      "httpsUrl": "git+https://github.com/dichnd/loopback-connector-cassandra.git",
+      "gitUrl": "git://github.com/dichnd/loopback-connector-cassandra.git",
+      "shortcut": "github:dichnd/loopback-connector-cassandra",
+      "directUrl": "https://raw.githubusercontent.com/dichnd/loopback-connector-cassandra/master/package.json"
+    }
+  },
+  "_requiredBy": [
+    "/"
+  ],
+  "_resolved": "git+https://github.com/dichnd/loopback-connector-cassandra.git#96a86f88b0f84f73e07b8004cc09efe21f7a4ace",
+  "_shasum": "bbc889c7e55e75c127c93cf53cbfa29db12fe48b",
+  "_shrinkwrap": null,
+  "_spec": "loopback-connector-cassandra@git+https://github.com/dichnd/loopback-connector-cassandra.git",
+  "_where": "E:\\codes\\test-cassandra-connector",
+  "bugs": {
+    "url": "https://github.com/strongloop/loopback-connector-cassandra/issues"
   },
   "dependencies": {
     "async": "^1.4.2",
     "cassandra-driver": "^3.0.2",
     "debug": "^2.2.0",
     "loopback-connector": "^2.3.0",
+    "node-ipc": "^8.10.3",
+    "sl-blip": "http://blip.strongloop.com/loopback-connector-cassandra@1.0.0",
     "uid-safe": "^2.1.3"
   },
+  "description": "Loopback Cassandra Connector",
   "devDependencies": {
     "bluebird": "^2.9.34",
     "loopback-datasource-juggler": "^2.36.0",
@@ -28,15 +80,32 @@
     "should": "^7.0.3",
     "sinon": "^1.15.4"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/strongloop/loopback-connector-cassandra.git"
-  },
+  "gitHead": "96a86f88b0f84f73e07b8004cc09efe21f7a4ace",
+  "homepage": "https://github.com/strongloop/loopback-connector-cassandra#readme",
+  "keywords": [
+    "StrongLoop",
+    "LoopBack",
+    "Cassandra",
+    "DataSource",
+    "Connector"
+  ],
   "license": {
     "name": "Dual Artistic-2.0/StrongLoop",
     "url": "https://github.com/strongloop/loopback-connector-cassandra/blob/master/LICENSE"
   },
+  "main": "index.js",
+  "name": "loopback-connector-cassandra",
   "optionalDependencies": {
     "sl-blip": "http://blip.strongloop.com/loopback-connector-cassandra@1.0.0"
-  }
+  },
+  "readme": "## loopback-connector-cassandra\r\n\r\nThe Cassandra Connector module for for [loopback-datasource-juggler](http://docs.strongloop.com/loopback-datasource-juggler/).\r\n\r\nPlease see the [official documentation](http://docs.strongloop.com/display/LB/Cassandra+connector).\r\n\r\n\r\n## Connector settings\r\n\r\n",
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/strongloop/loopback-connector-cassandra.git"
+  },
+  "scripts": {
+    "test": "mocha -R spec --timeout 10000 --require test/init.js test/*.test.js"
+  },
+  "version": "1.0.0"
 }

@@ -3,9 +3,12 @@
  */
 var cassandra = require('cassandra-driver');
 var Connector = require('loopback-connector').Connector;
-var ParameterizedSQL = SqlConnector.ParameterizedSQL;
 var util = require('util');
 var debug = require('debug')('loopback:connector:cassandra');
+var cassandraUtil = require('../lib/cassandra_util');
+var logger = console;
+
+var TAG = 'loopback-connector-cassandra: ';
 
 /**
  *
@@ -23,8 +26,53 @@ exports.initialize = function initializeDataSource(dataSource, callback) {
 
     var dbSettings = dataSource.settings || {};
 
-    dataSource.connector = new Cassandra(cassandra, dbSettings);
+    var connector = new Cassandra(cassandra, dbSettings);
+    dataSource.connector = connector;
     dataSource.connector.dataSource = dataSource;
+
+    /**
+     * define DataAccessObject to mixin to model class
+     * @constructor
+     */
+    var DataAccessObject = function() {
+    };
+
+    // Copy the methods from default DataAccessObject
+    if (dataSource.constructor.DataAccessObject) {
+        for (var i in dataSource.constructor.DataAccessObject) {
+            DataAccessObject[i] = dataSource.constructor.DataAccessObject[i];
+        }
+        /* eslint-disable one-var */
+        for (var i in dataSource.constructor.DataAccessObject.prototype) {
+            DataAccessObject.prototype[i] = dataSource.constructor.DataAccessObject.prototype[i];
+        }
+        /* eslint-enable one-var */
+
+        DataAccessObject.create = function (data, callback) {
+            connector.create(this.modelName, data, callback);
+        };
+
+        DataAccessObject.findOne = function (keyValues, columns, callback) {
+            connector.findOne(this.modelName, keyValues, columns, callback);
+        };
+
+        DataAccessObject.find = function (keyValues, columns, orderBy, limit, callback) {
+            connector.find(this.modelName, keyValues, columns, orderBy, limit, callback);
+        };
+
+        DataAccessObject.patch = function (data, callback) {
+            connector.patch(this.modelName, data, false, callback);
+        };
+
+        DataAccessObject.update = function (data, callback) {
+            connector.update(this.modelName, data, true, callback);
+        };
+
+        DataAccessObject.delete = function (keyValues, columns, callback) {
+            connector.delete(this.modelName, keyValues, columns, callback);
+        };
+    }
+    connector.DataAccessObject = DataAccessObject;
 
     if (callback) {
         dataSource.connecting = true;
@@ -53,6 +101,7 @@ exports.initialize = function initializeDataSource(dataSource, callback) {
  * @constructor
  */
 function Cassandra(cassandra, settings) {
+    console.log(settings);
     // this.name = 'cassandra';
     // this._models = {};
     // this.settings = settings;
@@ -77,7 +126,9 @@ Cassandra.prototype.getDefaultSchemaName = function () {
  * @callback {Function} [callback] The callback after the connection is established
  */
 Cassandra.prototype.connect = function (callback) {
-    var cassandraClient = this.cassandraClient = require('../lib/cassandra_client')(this.settings)
+    var self = this;
+    console.log(this.settings);
+    var cassandraClient = this.cassandraClient = require('../lib/cassandra_client')(self.settings)
     process.nextTick(function () {
         callback && callback(null, cassandraClient);
     });
@@ -87,166 +138,187 @@ Cassandra.prototype.getTypes = function() {
     return ['db', 'nosql', 'cassandra'];
 };
 
-Cassandra.prototype.create = function (model, data, options, callback) {
+Cassandra.prototype.create = function (model, data, callback) {
+    var modelDefine = this.getModelDefinition(model);
+    var props = modelDefine.model.definition.rawProperties;
+    var fields = cassandraUtil.generateFields(props, data);
+    var values = cassandraUtil.generateValues(props, data);
+    var params = cassandraUtil.generateParams(props, data);
 
+    var tableName = this.getTableName(model);
+
+    this.cassandraClient.execute('INSERT INTO ' + tableName + ' ' + fields + ' VALUES ' + values,
+        params, {prepare: true}, function (error, results) {
+            if(error) {
+                logger.log('error', TAG + 'insertRow: ' + JSON.stringify(error), {table_name: tableName, instance: data});
+                logger.log(error);
+            }
+
+            callback(error, results);
+        });
+}
+
+Cassandra.prototype.findOne = function (model, keyValues, columns, callback) {
+    console.log(model);
+    if(typeof columns == 'function') {
+        callback = columns;
+        columns = null;
+    }
+
+    var modelDefine = this.getModelDefinition(model);
+    var partitionKeys = modelDefine.model.definition.settings.partitionKeys;
+    var clustering = modelDefine.model.definition.settings.clustering;
+
+    var keys = partitionKeys.concat(clustering);
+
+    for(var i = 0; i < keys.length; i ++) {
+        if(!keyValues[keys[i]]) {
+            var error = {};
+            error.ec = 422;
+            error.message = 'partition or clustering key ' + keys[i] + ' must be defined!';
+            return callback(error);
+        }
+    }
+
+    var whereClause = cassandraUtil.genWhereClause(keys);
+    var params = [];
+    for(var i = 0; i < keys.length; i ++) {
+        params.push(keyValues[keys[i]]);
+    }
+    var selectColumn = cassandraUtil.genColumn(columns) || '*';
+    var tableName = this.getTableName(model);
+
+    this.cassandraClient.execute('SELECT ' + selectColumn + ' FROM ' + tableName + (whereClause ? (' WHERE ' + whereClause) : ''),
+        params, {prepare: true}, function (error, results) {
+            if(error) {
+                logger.log('error', TAG + 'selectRows: ' + JSON.stringify(error), {table_name: tableName, where: whereClause, params: params});
+                console.log(error);
+            }
+
+            cassandraUtil.responseOneRow(error, results, callback);
+        });
+}
+
+Cassandra.prototype.find = function (model, keyValues, columns, orderBy, limit, callback) {
+    if(typeof columns == 'function') {
+        callback = columns;
+        columns = null;
+    }
+
+    var keys = keyValues ? Object.keys(keyValues) : [];
+
+    var whereClause = cassandraUtil.genWhereClause(keys);
+    var params = [];
+    for(var i = 0; i < keys.length; i ++) {
+        params.push(keyValues[keys[i]]);
+    }
+    var selectColumn = cassandraUtil.genColumn(columns) || '*';
+    var tableName = this.getTableName(model);
+
+    this.cassandraClient.execute('SELECT ' + selectColumn + ' FROM ' + tableName + (whereClause ? (' WHERE ' + whereClause) : '') +
+        (orderBy ? (' ORDER BY ' + orderBy) : '') +
+        (limit ? (' LIMIT ' + limit) : ''),
+        params, {prepare: true}, function (error, results) {
+            if(error) {
+                logger.log('error', TAG + 'selectRows: ' + JSON.stringify(error), {table_name: tableName, where: whereClause, params: params});
+                console.log(error);
+            }
+
+            cassandraUtil.responseArray(error, results, callback);
+        });
 }
 
 /**
- * Execute the sql statement
- *
- * @param {String} sql The CQL statement
- * @param {String[]} params The parameter values for the CQL statement
- * @param {Object} [options] Options object
- * @callback {Function} [callback] The callback after the CQL statement is executed
- * @param {String|Error} err The error string or object
- * @param {Object[]) data The result from the CQL
+ * update or create row
+ * @param model
+ * @param data
+ * @param checkExists
+ * @param {error} callback
  */
-Cassandra.prototype.executeSQL = function (sql, params, options, callback) {
-    var self = this;
+Cassandra.prototype.update = function (model, data, checkExists, callback) {
+    var modelDefine = this.getModelDefinition(model);
+    var partitionKeys = modelDefine.model.definition.settings.partitionKeys;
+    var clustering = modelDefine.model.definition.settings.clustering;
+    var props = modelDefine.model.definition.rawProperties;
 
-    if (params && params.length > 0) {
-        debug('CQL: %s\nParameters: %j', sql, params);
-    } else {
-        debug('CQL: %s', sql);
+    var keys = partitionKeys.concat(clustering);
+    var keyValues = [];
+    for(var i = 0; i < keys.length; i ++) {
+        if(!data[keys[i]]) {
+            var error = {};
+            error.ec = 422;
+            error.message = 'partition or clustering key ' + keys[i] + ' must be defined!';
+            return callback(error);
+        }
+        keyValues.push(data[keys[i]]);
+        delete data[keys[i]];
     }
 
-    this.client.execute(sql, params, {prepare: true}, function (err, data) {
-        // if(err) console.error(err);
-        if (err && self.settings.debug) {
-            debug(err);
-        }
-        debug("%j", data);
-        if (!err) {
-            var result = null;
-            if (data) {
-                switch (data.command) {
-                    case 'DELETE':
-                    case 'UPDATE':
-                        result = {count: data.rowCount};
-                        break;
-                    default:
-                        result = data.rows;
-                }
+    var assignments = cassandraUtil.generateAssignments(props, data);
+    var params = cassandraUtil.generateParams(props, data);
+    params = params.concat(keyValues);
+    var whereClause = cassandraUtil.genWhereClause(keys);
+    var tableName = this.getTableName(model);
+
+    this.cassandraClient.execute('UPDATE ' + tableName + ' SET ' + assignments + ' WHERE ' + whereClause + (checkExists ? ' IF EXISTS' : ''),
+        params, {prepare: true}, function (error, results) {
+            if(error) {
+                logger.log('error', TAG + 'updateRow: ' + JSON.stringify(error), {table_name: tableName, keys: keys, values: keyValues, update_info: data});
+                logger.log(error);
             }
-        }
-        callback(err ? err : null, result);
-    });
 
-};
+            callback(error, results);
+        });
+}
 
-Cassandra.prototype.buildInsertReturning = function (model, data, options) {
-    var idColumnNames = [];
-    var idNames = this.idNames(model);
-    for (var i = 0, n = idNames.length; i < n; i++) {
-        idColumnNames.push(this.columnEscaped(model, idNames[i]));
-    }
-    return 'RETURNING ' + idColumnNames.join(',');
-};
-
-Cassandra.prototype.buildInsertDefaultValues = function (model, data, options) {
-    return 'DEFAULT VALUES';
-};
-
-// FIXME: [rfeng] The native implementation of upsert only works with
-// cassandra 9.1 or later as it requres writable CTE
-// See https://github.com/strongloop/loopback-connector-cassandra/issues/27
 /**
- * Update if the model instance exists with the same id or create a new instance
  *
- * @param {String} model The model name
- * @param {Object} data The model instance data
- * @callback {Function} [callback] The callback function
- * @param {String|Error} err The error string or object
- * @param {Object} The updated model instance
+ * @param model
+ * @param keyValues
+ * @param columns
+ * @param callback
+ * @return {*}
  */
-/*
- Cassandra.prototype.updateOrCreate = function (model, data, callback) {
- var self = this;
- data = self.mapToDB(model, data);
- var props = self._categorizeProperties(model, data);
- var idColumns = props.ids.map(function(key) {
- return self.columnEscaped(model, key); }
- );
- var nonIdsInData = props.nonIdsInData;
- var query = [];
- query.push('WITH update_outcome AS (UPDATE ', self.tableEscaped(model), ' SET ');
- query.push(self.toFields(model, data, false));
- query.push(' WHERE ');
- query.push(idColumns.map(function (key, i) {
- return ((i > 0) ? ' AND ' : ' ') + key + '=$' + (nonIdsInData.length + i + 1);
- }).join(','));
- query.push(' RETURNING ', idColumns.join(','), ')');
- query.push(', insert_outcome AS (INSERT INTO ', self.tableEscaped(model), ' ');
- query.push(self.toFields(model, data, true));
- query.push(' WHERE NOT EXISTS (SELECT * FROM update_outcome) RETURNING ', idColumns.join(','), ')');
- query.push(' SELECT * FROM update_outcome UNION ALL SELECT * FROM insert_outcome');
- var queryParams = [];
- nonIdsInData.forEach(function(key) {
- queryParams.push(data[key]);
- });
- props.ids.forEach(function(key) {
- queryParams.push(data[key] || null);
- });
- var idColName = self.idColumn(model);
- self.query(query.join(''), queryParams, function(err, info) {
- if (err) {
- return callback(err);
- }
- var idValue = null;
- if (info && info[0]) {
- idValue = info[0][idColName];
- }
- callback(err, idValue);
- });
- };
- */
+Cassandra.prototype.delete = function (model, keyValues, columns, callback) {
+    var keys = keyValues ? Object.keys(keyValues) : [];
 
-Cassandra.prototype.fromColumnValue = function (prop, val) {
-    if (val == null) {
-        return val;
+    if(keys.length == 0) {
+        var error = {};
+        error.ec = 422;
+        error.message = 'keyValues must be defined!';
+        return callback(error);
     }
-    var type = prop.type && prop.type.name;
-    if (prop && type === 'Boolean') {
-        if (typeof val === 'boolean') {
-            return val;
-        } else {
-            return (val === 'Y' || val === 'y' || val === 'T' ||
-            val === 't' || val === '1');
-        }
-    } else if (prop && type === 'GeoPoint' || type === 'Point') {
-        if (typeof val === 'string') {
-            // The point format is (x,y)
-            var point = val.split(/[\(\)\s,]+/).filter(Boolean);
-            return {
-                lat: +point[0],
-                lng: +point[1]
-            };
-        } else if (typeof val === 'object' && val !== null) {
-            // Now cassandra driver converts point to {x: lng, y: lat}
-            return {
-                lng: val.x,
-                lat: val.y
-            };
-        } else {
-            return val;
-        }
-    } else {
-        return val;
-    }
-};
 
-/*!
- * Convert to the Database name
- * @param {String} name The name
- * @returns {String} The converted name
- */
-Cassandra.prototype.dbName = function (name) {
-    if (!name) {
-        return name;
+    var whereClause = cassandraUtil.genWhereClause(keys);
+    var params = [];
+    for(var i = 0; i < keys.length; i ++) {
+        params.push(keyValues[keys[i]]);
     }
-    // Cassandra default to lowercase names
-    return name.toLowerCase();
-};
+    var selectColumn = cassandraUtil.genColumn(columns) || '';
+    var tableName = this.getTableName(model);
+
+    this.cassandraClient.execute('DELETE ' + selectColumn + ' FROM ' + tableName + ' WHERE ' + whereClause,
+        params, {prepare: true}, function (error, results) {
+            if(error) {
+                logger.log('error', TAG + 'deleteRows: ' + JSON.stringify(error), {table_name: tableName, keys: keys, values: keyValues});
+                logger.log(error);
+            }
+
+            callback(error, results);
+        });
+}
+
+Cassandra.prototype.getTableName = function (model) {
+    var modelDefine = this.getModelDefinition(model);
+    return modelDefine.settings.tableName || model;
+}
+
+Cassandra.prototype.getCassandraType = function (type) {
+    var cassandraTypeMapping = {
+        'string': 'text'
+    }
+    return cassandraTypeMapping[type] || type;
+}
 
 function escapeIdentifier(str) {
     var escaped = '"';
@@ -305,74 +377,6 @@ Cassandra.prototype.escapeValue = function (value) {
     return value;
 };
 
-Cassandra.prototype.schema = function (model) {
-    var modelDef = this.getModelDefinition(model);
-    var meta = modelDef.settings[this.name];
-    var s = meta && (meta.schema || meta.keyspace);
-    return s || this.settings.keyspace;
-};
-
-Cassandra.prototype.tableEscaped = function (model) {
-    var schema = this.schema(model);
-    if (schema) {
-        return this.escapeName(schema) + '.' +
-            this.escapeName(this.table(model));
-    } else {
-        return this.escapeName(this.table(model));
-    }
-};
-
-function buildLimit(limit, offset) {
-    var clause = [];
-    if (isNaN(limit)) {
-        limit = 0;
-    }
-    if (isNaN(offset)) {
-        offset = 0;
-    }
-    if (!limit && !offset) {
-        return '';
-    }
-    if (limit) {
-        clause.push('LIMIT ' + limit);
-    }
-    if (offset) {
-        clause.push('OFFSET ' + offset);
-    }
-    return clause.join(' ');
-}
-
-Cassandra.prototype.applyPagination = function (model, stmt, filter) {
-    var limitClause = buildLimit(filter.limit, filter.offset || filter.skip);
-    return stmt.merge(limitClause);
-};
-
-Cassandra.prototype.buildExpression = function (columnName, operator,
-                                                operatorValue, propertyDefinition) {
-    switch (operator) {
-        case 'like':
-            return new ParameterizedSQL(columnName + " LIKE ? ESCAPE '\\'",
-                [operatorValue]);
-        case 'nlike':
-            return new ParameterizedSQL(columnName + " NOT LIKE ? ESCAPE '\\'",
-                [operatorValue]);
-        case 'regexp':
-            if (operatorValue.global)
-                console.warn('Cassandra regex syntax does not respect the `g` flag');
-
-            if (operatorValue.multiline)
-                console.warn('Cassandra regex syntax does not respect the `m` flag');
-
-            var regexOperator = operatorValue.ignoreCase ? ' ~* ?' : ' ~ ?';
-            return new ParameterizedSQL(columnName + regexOperator,
-                [operatorValue.source]);
-        default:
-            // invoke the base implementation of `buildExpression`
-            return this.invokeSuper('buildExpression', columnName, operator,
-                operatorValue, propertyDefinition);
-    }
-};
-
 /**
  * Disconnect from Cassandra
  * @param {Function} [cb] The callback function
@@ -395,108 +399,6 @@ Cassandra.prototype.disconnect = function disconnect(cb) {
 Cassandra.prototype.ping = function (cb) {
     this.execute('SELECT count(*) FROM system.schema_keyspaces', [], cb);
 };
-
-Cassandra.prototype.getInsertedId = function (model, info) {
-    var idColName = this.idColumn(model);
-    var idValue;
-    if (info && info[0]) {
-        idValue = info[0][idColName];
-    }
-    return idValue;
-};
-
-/*!
- * Convert property name/value to an escaped DB column value
- * @param {Object} prop Property descriptor
- * @param {*} val Property value
- * @returns {*} The escaped value of DB column
- */
-Cassandra.prototype.toColumnValue = function (prop, val) {
-    if (val == null) {
-        // Cassandra complains with NULLs in not null columns
-        // If we have an autoincrement value, return DEFAULT instead
-        if (prop.autoIncrement || prop.id) {
-            return new ParameterizedSQL('DEFAULT');
-        }
-        else {
-            return null;
-        }
-    }
-    if (prop.type === String) {
-        return String(val);
-    }
-    if (prop.type === Number) {
-        if (isNaN(val)) {
-            // Map NaN to NULL
-            return val;
-        }
-        return val;
-    }
-
-    if (prop.type === Date || prop.type.name === 'Timestamp') {
-        if (!val.toISOString) {
-            val = new Date(val);
-        }
-        var iso = val.toISOString();
-
-        // Pass in date as UTC and make sure Postgresql stores using UTC timezone
-        return new ParameterizedSQL({
-            sql: '?::TIMESTAMP WITH TIME ZONE',
-            params: [iso]
-        });
-    }
-
-    // Cassandra support char(1) Y/N
-    if (prop.type === Boolean) {
-        if (val) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    if (prop.type.name === 'GeoPoint' || prop.type.name === 'Point') {
-        return new ParameterizedSQL({
-            sql: 'point(?,?)',
-            // Postgres point is point(lng, lat)
-            params: [val.lng, val.lat]
-        });
-    }
-
-    return val;
-}
-
-/**
- * Get the place holder in CQL for identifiers, such as ??
- * @param {String} key Optional key, such as 1 or id
- * @returns {String} The place holder
- */
-Cassandra.prototype.getPlaceholderForIdentifier = function (key) {
-    throw new Error('Placeholder for identifiers is not supported');
-};
-
-/**
- * Get the place holder in CQL for values, such as :1 or ?
- * @param {String} key Optional key, such as 1 or id
- * @returns {String} The place holder
- */
-Cassandra.prototype.getPlaceholderForValue = function (key) {
-    return '$' + key;
-};
-
-Cassandra.prototype.getCountForAffectedRows = function (model, info) {
-    return info && info.count;
-};
-
-/*
- Cassandra.prototype.automigrate = function(models, cb) {
- process.nextTick(cb);
- }
- */
-
-Cassandra.prototype.autoupdate = function (models, cb) {
-    process.nextTick(cb);
-}
 
 require('./migration')(Cassandra);
 
