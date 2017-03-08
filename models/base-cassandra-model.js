@@ -45,9 +45,13 @@ module.exports = function(BaseCassandraModel) {
         // AnotherModel is based of another model, like PersistedModel.
 
         var partitionKeys = this.definition.settings.partitionKeys;
-        var clustering = this.definition.settings.clustering;
+        var clustering = this.definition.settings.clustering || [];
         var indexes = this.definition.settings.indexes ? Object.keys(this.definition.settings.indexes) : [];
         var props = this.definition.rawProperties;
+
+        if(!partitionKeys || !partitionKeys.length) {
+            throw new Error('partition keys must be defined in model ' + this.modelName)
+        }
 
         var keys = partitionKeys.concat(clustering);
         var keysAndIndexs = keys.concat(indexes);
