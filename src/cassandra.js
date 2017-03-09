@@ -71,6 +71,10 @@ exports.initialize = function initializeDataSource(dataSource, callback) {
         DataAccessObject.delete = function (keyValues, columns, callback) {
             connector.delete(this.modelName, keyValues, columns, callback);
         };
+
+        DataAccessObject.eachPage = function (keyValues, options, columns, orderBy, eachCb, endCb) {
+            connector.eachPage(this.modelName, keyValues, options, columns, orderBy, eachCb, endCb);
+        };
     }
     connector.DataAccessObject = DataAccessObject;
 
@@ -203,6 +207,8 @@ Cassandra.prototype.find = function (model, keyValues, columns, orderBy, limit, 
     if(typeof columns == 'function') {
         callback = columns;
         columns = null;
+        orderBy = null;
+        limit = null;
     }
 
     var keys = keyValues ? Object.keys(keyValues) : [];
@@ -226,6 +232,21 @@ Cassandra.prototype.find = function (model, keyValues, columns, orderBy, limit, 
 
             cassandraUtil.responseArray(error, results, callback);
         });
+}
+
+Cassandra.prototype.eachPage = function (model, keyValues, options, columns, orderBy, eachCb, endCb) {
+    var keys = keyValues ? Object.keys(keyValues) : [];
+
+    var whereClause = cassandraUtil.genWhereClause(keys);
+    var params = [];
+    for(var i = 0; i < keys.length; i ++) {
+        params.push(keyValues[keys[i]]);
+    }
+    var selectColumn = cassandraUtil.genColumn(columns) || '*';
+    var tableName = this.getTableName(model);
+
+    this.cassandraClient.eachPage('SELECT ' + selectColumn + ' FROM ' + tableName + (whereClause ? (' WHERE ' + whereClause) : '') +
+        (orderBy ? (' ORDER BY ' + orderBy) : ''), params, options, eachCb, endCb);
 }
 
 /**
