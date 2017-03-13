@@ -257,6 +257,11 @@ Cassandra.prototype.eachPage = function (model, keyValues, options, columns, ord
  * @param {error} callback
  */
 Cassandra.prototype.update = function (model, data, checkExists, callback) {
+    if(typeof checkExists == 'function') {
+        callback = checkExists;
+        checkExists = false;
+    }
+
     var modelDefine = this.getModelDefinition(model);
     var partitionKeys = modelDefine.model.definition.settings.partitionKeys || [];
     var clustering = modelDefine.model.definition.settings.clustering || [];
