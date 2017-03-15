@@ -61,7 +61,7 @@ exports.initialize = function initializeDataSource(dataSource, callback) {
         };
 
         DataAccessObject.patch = function (data, callback) {
-            connector.patch(this.modelName, data, false, callback);
+            connector.update(this.modelName, data, false, callback);
         };
 
         DataAccessObject.update = function (data, callback) {
@@ -74,6 +74,10 @@ exports.initialize = function initializeDataSource(dataSource, callback) {
 
         DataAccessObject.eachPage = function (keyValues, options, columns, orderBy, eachCb, endCb) {
             connector.eachPage(this.modelName, keyValues, options, columns, orderBy, eachCb, endCb);
+        };
+
+        DataAccessObject.eachPageWhere = function (whereClause, params, options, columns, orderBy, eachCb, endCb) {
+            connector.eachPageWhere(this.modelName, whereClause, params, options, columns, orderBy, eachCb, endCb);
         };
     }
     connector.DataAccessObject = DataAccessObject;
@@ -105,12 +109,7 @@ exports.initialize = function initializeDataSource(dataSource, callback) {
  * @constructor
  */
 function Cassandra(cassandra, settings) {
-    console.log(settings);
-    // this.name = 'cassandra';
-    // this._models = {};
-    // this.settings = settings;
     this.constructor.super_.call(this, 'cassandra', settings);
-    this.clientConfig = settings;
     this.cassandra = cassandra;
     this.settings = settings;
     if (settings.debug) {
@@ -131,7 +130,6 @@ Cassandra.prototype.getDefaultSchemaName = function () {
  */
 Cassandra.prototype.connect = function (callback) {
     var self = this;
-    console.log(this.settings);
     var cassandraClient = this.cassandraClient = require('../lib/cassandra_client')(self.settings)
     process.nextTick(function () {
         callback && callback(null, cassandraClient);
@@ -163,7 +161,6 @@ Cassandra.prototype.create = function (model, data, callback) {
 }
 
 Cassandra.prototype.findOne = function (model, keyValues, columns, callback) {
-    console.log(model);
     if(typeof columns == 'function') {
         callback = columns;
         columns = null;
@@ -242,6 +239,14 @@ Cassandra.prototype.eachPage = function (model, keyValues, options, columns, ord
     for(var i = 0; i < keys.length; i ++) {
         params.push(keyValues[keys[i]]);
     }
+    var selectColumn = cassandraUtil.genColumn(columns) || '*';
+    var tableName = this.getTableName(model);
+
+    this.cassandraClient.eachPage('SELECT ' + selectColumn + ' FROM ' + tableName + (whereClause ? (' WHERE ' + whereClause) : '') +
+        (orderBy ? (' ORDER BY ' + orderBy) : ''), params, options, eachCb, endCb);
+}
+
+Cassandra.prototype.eachPageWhere = function (model, whereClause, params, options, columns, orderBy, eachCb, endCb) {
     var selectColumn = cassandraUtil.genColumn(columns) || '*';
     var tableName = this.getTableName(model);
 
