@@ -49,8 +49,8 @@ exports.initialize = function initializeDataSource(dataSource, callback) {
         }
         /* eslint-enable one-var */
 
-        DataAccessObject.create = function (data, callback) {
-            return connector.create(this.modelName, data, callback);
+        DataAccessObject.create = function (data, options, callback) {
+            return connector.create(this.modelName, data, options, callback);
         };
 
         DataAccessObject.upsert = function (data, callback) {
@@ -149,9 +149,14 @@ Cassandra.prototype.getTypes = function() {
     return ['db', 'nosql', 'cassandra'];
 };
 
-Cassandra.prototype.create = function (model, data, callback) {
+Cassandra.prototype.create = function (model, data, options, callback) {
+    if(typeof options == 'function') {
+        callback = options;
+        options = null;
+    }
+
     var self = this;
-    var createInfo = this.buildCreate(model, data);
+    var createInfo = this.buildCreate(model, data, options);
     var query = createInfo.query;
     var params = createInfo.params;
 
@@ -415,7 +420,7 @@ Cassandra.prototype.buildWhere = function (model, where) {
     }
 }
 
-Cassandra.prototype.buildCreate = function (model, data) {
+Cassandra.prototype.buildCreate = function (model, data, options) {
     var modelDefine = this.getModelDefinition(model);
     var props = modelDefine.model.definition.rawProperties;
     var fields = cassandraUtil.generateFields(props, data);
@@ -425,6 +430,10 @@ Cassandra.prototype.buildCreate = function (model, data) {
     var tableName = this.getTableName(model);
 
     var query = 'INSERT INTO ' + tableName + ' ' + fields + ' VALUES ' + values;
+
+    if(options && options.ttl) {
+        query += ' USING TTL ' + options.ttl
+    }
 
     return {
         query: query,
@@ -608,8 +617,8 @@ function BatchExecutor(model, cassandraConnector) {
     this.connector = cassandraConnector;
 }
 
-BatchExecutor.prototype.create = function (data) {
-    var createInfo = this.connector.buildCreate(this.model, data);
+BatchExecutor.prototype.create = function (data, options) {
+    var createInfo = this.connector.buildCreate(this.model, data, options);
     this.batchQuery.push({
         query: createInfo.query,
         params: createInfo.params
