@@ -108,5 +108,11 @@
   "scripts": {
     "test": "mocha -R spec --timeout 10000 --require test/init.js test/*.test.js"
   },
-  "version": "1.0.0"
+  "version": "1.0.1",
+  "maintainers": [
+    {
+      "name": "dinh.dich",
+      "email": "dichnd2806@gmail.com"
+    }
+  ]
 }
