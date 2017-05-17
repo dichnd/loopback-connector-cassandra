@@ -65,21 +65,21 @@
   "dependencies": {
     "async": "^1.4.2",
     "cassandra-driver": "^3.0.2",
-    "debug": "^2.2.0",
+    "debug": "2.2.0",
     "loopback-connector": "^2.3.0",
-    "node-ipc": "^8.10.3",
+    "node-ipc": "8.10.3",
     "sl-blip": "http://blip.strongloop.com/loopback-connector-cassandra@1.0.0",
-    "uid-safe": "^2.1.4",
-    "node-ipc-service": "git+https://gitlab.com/dinh.dich/node-ipc-service.git"
+    "uid-safe": "2.1.4",
+    "node-ipc-service": "^1.0.1"
   },
   "description": "Loopback Cassandra Connector",
   "devDependencies": {
     "bluebird": "^2.9.34",
-    "loopback-datasource-juggler": "^2.36.0",
-    "mocha": "^2.2.5",
-    "rc": "^1.1.0",
-    "should": "^7.0.3",
-    "sinon": "^1.15.4"
+    "loopback-datasource-juggler": "2.36.0",
+    "mocha": "2.2.5",
+    "rc": "1.1.0",
+    "should": "7.0.3",
+    "sinon": "1.15.4"
   },
   "gitHead": "96a86f88b0f84f73e07b8004cc09efe21f7a4ace",
   "homepage": "https://github.com/strongloop/loopback-connector-cassandra#readme",
@@ -95,7 +95,7 @@
     "url": "https://github.com/strongloop/loopback-connector-cassandra/blob/master/LICENSE"
   },
   "main": "index.js",
-  "name": "loopback-connector-cassandra",
+  "name": "loopback-connector-cassandra-ipc",
   "optionalDependencies": {
     "sl-blip": "http://blip.strongloop.com/loopback-connector-cassandra@1.0.0"
   },
