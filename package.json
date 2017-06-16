@@ -109,7 +109,7 @@
   "scripts": {
     "test": "mocha -R spec --timeout 10000 --require test/init.js test/*.test.js"
   },
-  "version": "1.0.2",
+  "version": "1.0.3",
   "maintainers": [
     {
       "name": "dinh.dich",

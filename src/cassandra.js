@@ -501,7 +501,7 @@ Cassandra.prototype.buildUpdateAssignment = function (props, data) {
     var params = [];
 
     __.forEach(data, function (value, key) {
-        if(typeof value == 'object') {
+        if(value && typeof value == 'object') {
             if(value.hasOwnProperty('$add')) {
                 assignments += key + ' = ' + key + ' + ?,';
                 params.push(value['$add'])
