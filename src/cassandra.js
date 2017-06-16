@@ -8,6 +8,7 @@ var debug = require('debug')('loopback:connector:cassandra');
 var cassandraUtil = require('../lib/cassandra_util');
 var logger = console;
 var Promise = require('bluebird');
+var __ = require('lodash')
 
 var TAG = 'loopback-connector-cassandra: ';
 
@@ -369,42 +370,47 @@ Cassandra.prototype.buildWhere = function (model, where) {
     where = where || {}
     var expressions = [];
     var params = [];
-    for(var key in where) {
-        if(typeof where[key] == 'object') {
-            var value = where[key];
-            for(var operator in value) {
+
+    __.forEach(where, function (value, key) {
+        if(typeof value == 'object') {
+            __.forEach(value, function (v, operator) {
                 switch(operator) {
                     case '$lt':
+                    case 'lt':
                         expressions.push(key + ' < ?')
-                        params.push(value[operator])
+                        params.push(v)
                         break;
                     case '$lte':
+                    case 'lte':
                         expressions.push(key + ' <= ?')
-                        params.push(value[operator])
+                        params.push(v)
                         break;
                     case '$gt':
+                    case 'gt':
                         expressions.push(key + ' > ?')
-                        params.push(value[operator])
+                        params.push(v)
                         break;
                     case '$gte':
+                    case 'gte':
                         expressions.push(key + ' >= ?')
-                        params.push(value[operator])
+                        params.push(v)
                         break;
                     case '$eq':
+                    case 'eq':
                         expressions.push(key + ' = ?')
-                        params.push(value[operator])
+                        params.push(v)
                         break;
                     default:
                         expressions.push(key + '.' + operator + ' = ?')
-                        params.push(value[operator])
+                        params.push(v)
                         break;
                 }
-            }
+            })
         } else {
             expressions.push(key + ' = ?')
             params.push(where[key])
         }
-    }
+    })
 
     if(expressions.length > 0) {
         var whereClause = expressions.join(' AND ');
@@ -494,24 +500,23 @@ Cassandra.prototype.buildUpdateAssignment = function (props, data) {
     var assignments = '';
     var params = [];
 
-    for(var field in props) {
-        if(typeof data[field] == 'object') {
-            var value = data[field];
-            if(value['$add']) {
-                assignments += field + ' = ' + field + ' + ?,';
+    __.forEach(data, function (value, key) {
+        if(typeof value == 'object') {
+            if(value.hasOwnProperty('$add')) {
+                assignments += key + ' = ' + key + ' + ?,';
                 params.push(value['$add'])
-            } else if(value['$sub']) {
-                assignments += field + ' = ' + field + ' - ?,';
+            } else if(value.hasOwnProperty('$sub')) {
+                assignments += key + ' = ' + key + ' - ?,';
                 params.push(value['$sub'])
             } else {
-                assignments += field + ' = ?,';
-                params.push(data[field])
+                assignments += key + ' = ?,';
+                params.push(value)
             }
-        } else if(data[field] != undefined) {
-            assignments += field + ' = ?,';
-            params.push(data[field])
+        } else if(value != undefined) {
+            assignments += key + ' = ?,';
+            params.push(value)
         }
-    }
+    })
 
     return {
         assign: assignments.substr(0, assignments.length - 1),

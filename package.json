@@ -66,11 +66,12 @@
     "async": "^1.4.2",
     "cassandra-driver": "^3.0.2",
     "debug": "2.2.0",
+    "lodash": "^4.17.4",
     "loopback-connector": "^2.3.0",
     "node-ipc": "8.10.3",
+    "node-ipc-service": "^1.0.1",
     "sl-blip": "http://blip.strongloop.com/loopback-connector-cassandra@1.0.0",
-    "uid-safe": "2.1.4",
-    "node-ipc-service": "^1.0.1"
+    "uid-safe": "2.1.4"
   },
   "description": "Loopback Cassandra Connector",
   "devDependencies": {
@@ -108,7 +109,7 @@
   "scripts": {
     "test": "mocha -R spec --timeout 10000 --require test/init.js test/*.test.js"
   },
-  "version": "1.0.1",
+  "version": "1.0.2",
   "maintainers": [
     {
       "name": "dinh.dich",
